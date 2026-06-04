@@ -13,7 +13,6 @@ enum BundledModelStore {
     enum Model: String {
         case qwen3ASR = "qwen3-asr-coreml"
         case sileroVAD = "silero-vad-coreml"
-        case kokoroTTS = "kokoro-tts-coreml"
     }
 
     static func preferredDirectory(for model: Model) -> ModelDirectory {
@@ -56,7 +55,6 @@ enum BundledModelStore {
             "config.json",
             "encoder.mlmodelc",
             "silero_vad.mlmodelc",
-            "kokoro_5s.mlmodelc",
         ]
         return knownFiles.contains { name in
             FileManager.default.fileExists(

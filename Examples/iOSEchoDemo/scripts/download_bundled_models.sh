@@ -13,7 +13,7 @@ else
   exit 1
 fi
 
-mkdir -p "$DEST_DIR/qwen3-asr-coreml" "$DEST_DIR/silero-vad-coreml" "$DEST_DIR/kokoro-tts-coreml"
+mkdir -p "$DEST_DIR/qwen3-asr-coreml" "$DEST_DIR/silero-vad-coreml"
 
 echo "Downloading Qwen3-ASR CoreML INT8..."
 "$HF_CLI" download aufklarer/Qwen3-ASR-CoreML \
@@ -37,19 +37,6 @@ echo "Downloading Silero VAD CoreML..."
 "$HF_CLI" download aufklarer/Silero-VAD-v5-CoreML \
   --local-dir "$DEST_DIR/silero-vad-coreml" \
   --max-workers 1
-
-echo "Downloading Kokoro TTS CoreML..."
-"$HF_CLI" download aufklarer/Kokoro-82M-CoreML \
-  --local-dir "$DEST_DIR/kokoro-tts-coreml" \
-  --max-workers 1 \
-  --include "kokoro_5s.mlmodelc/**" \
-  --include "G2PEncoder.mlmodelc/**" \
-  --include "G2PDecoder.mlmodelc/**" \
-  --include "vocab_index.json" \
-  --include "g2p_vocab.json" \
-  --include "us_gold.json" \
-  --include "us_silver.json" \
-  --include "voices/*.json"
 
 find "$DEST_DIR" -name ".cache" -type d -prune -exec rm -rf {} +
 find "$DEST_DIR" -name ".DS_Store" -type f -delete

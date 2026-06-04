@@ -25,7 +25,7 @@ struct CompanionChatView: View {
                     inputBar
                 }
             }
-            .navigationTitle("Echo Demo")
+            .navigationTitle("Transcription")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -81,10 +81,10 @@ struct CompanionChatView: View {
                     .font(.system(size: 48))
                     .foregroundStyle(.tint)
 
-                Text("Echo Demo")
+                Text("Transcription")
                     .font(.title2.bold())
 
-                Text("On-device voice echo\nASR + VAD + TTS")
+                Text("On-device Qwen3 ASR\nVAD + pseudo-streaming")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -129,14 +129,6 @@ struct CompanionChatView: View {
                             .id("partial")
                     }
 
-                    if vm.isGenerating {
-                        HStack {
-                            TypingIndicator()
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .id("typing")
-                    }
                 }
                 .padding(.vertical, 8)
             }
@@ -144,13 +136,6 @@ struct CompanionChatView: View {
                 withAnimation {
                     if let last = vm.messages.last {
                         proxy.scrollTo(last.id, anchor: .bottom)
-                    }
-                }
-            }
-            .onChange(of: vm.isGenerating) {
-                if vm.isGenerating {
-                    withAnimation {
-                        proxy.scrollTo("typing", anchor: .bottom)
                     }
                 }
             }
@@ -210,7 +195,6 @@ struct CompanionChatView: View {
 
     private var statusColor: Color {
         if vm.isSpeechDetected { return .red }
-        if vm.isGenerating { return .orange }
         if vm.isListening { return .green }
         return .gray
     }
@@ -231,14 +215,13 @@ struct CompanionChatView: View {
                     .foregroundStyle(vm.isSpeechDetected ? .red : (vm.isListening ? .green : .gray))
             }
 
-            TextField("Message...", text: $vm.inputText, axis: .vertical)
+            TextField("Add note...", text: $vm.inputText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...4)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(Color.gray.opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 20))
-                .disabled(vm.isGenerating)
                 .onSubmit { sendIfReady() }
 
             Button {
@@ -249,7 +232,6 @@ struct CompanionChatView: View {
             }
             .disabled(
                 vm.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                || vm.isGenerating
             )
         }
         .padding(.horizontal)
@@ -259,7 +241,7 @@ struct CompanionChatView: View {
 
     private func sendIfReady() {
         let text = vm.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !vm.isGenerating else { return }
+        guard !text.isEmpty else { return }
         vm.send(text)
     }
 }

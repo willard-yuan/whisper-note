@@ -11,7 +11,6 @@ let package = Package(
         .executableTarget(
             name: "iOSEchoDemo",
             dependencies: [
-                .product(name: "KokoroTTS", package: "Qwen3Speech"),
                 .product(name: "Qwen3ASR", package: "Qwen3Speech"),
                 .product(name: "SpeechVAD", package: "Qwen3Speech"),
                 .product(name: "AudioCommon", package: "Qwen3Speech"),

@@ -1,9 +1,9 @@
 # iOS Echo Demo
 
-ASR → TTS echo pipeline. Speak and hear it back.
+On-device Qwen3-ASR pseudo-streaming transcription.
 
-- **Device**: Qwen3-ASR CoreML INT8 pseudo-streaming + Kokoro TTS
-- **Simulator**: Qwen3-ASR CoreML INT8 pseudo-streaming + Apple built-in TTS
+- **Device**: Qwen3-ASR CoreML INT8 pseudo-streaming
+- **Simulator**: Qwen3-ASR CoreML INT8 pseudo-streaming
 
 ## Setup
 
@@ -32,7 +32,6 @@ The app looks for bundled models first:
 iOSEchoDemo/BundledModels/
   qwen3-asr-coreml/
   silero-vad-coreml/
-  kokoro-tts-coreml/
 ```
 
 If those directories are empty, it falls back to the library's default model
@@ -43,5 +42,4 @@ cache and downloads missing files.
 - Voice activity detection (Silero VAD)
 - Qwen3-ASR pseudo-streaming partials with final VAD commits
 - Force-cut at 10s with system message
-- Adaptive echo prevention (cooldown based on TTS audio duration)
 - Diagnostics view (CPU, memory, VAD level)

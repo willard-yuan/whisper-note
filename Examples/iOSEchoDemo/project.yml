@@ -31,8 +31,6 @@ targets:
       OTHER_LDFLAGS: ["-Wl,-undefined,dynamic_lookup"]
     dependencies:
       - package: Qwen3Speech
-        product: KokoroTTS
-      - package: Qwen3Speech
         product: Qwen3ASR
       - package: Qwen3Speech
         product: SpeechVAD

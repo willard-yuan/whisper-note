@@ -1,52 +1,9 @@
 import AVFoundation
-import CoreML
 import Foundation
 import os
 import Observation
-import KokoroTTS
 import Qwen3ASR
 import SpeechVAD
-import AudioCommon
-
-/// Apple built-in TTS for simulator — uses AVSpeechSynthesizer.speak() which plays
-/// directly through speakers. The .write() API produces empty buffers on simulator.
-final class AppleTTSModel: NSObject, SpeechGenerationModel, AVSpeechSynthesizerDelegate, @unchecked Sendable {
-    var sampleRate: Int { 24000 }
-    private let synthesizer = AVSpeechSynthesizer()
-    private var continuation: CheckedContinuation<[Float], Error>?
-
-    override init() {
-        super.init()
-        synthesizer.delegate = self
-    }
-
-    func generate(text: String, language: String?) async throws -> [Float] {
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: language ?? "en-US")
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        return try await withCheckedThrowingContinuation { cont in
-            self.continuation = cont
-            synthesizer.speak(utterance)
-        }
-    }
-
-    private func finish() {
-        // AVSpeechSynthesizer plays audio directly — return empty samples
-        // since the pipeline doesn't need to play them via StreamingAudioPlayer.
-        continuation?.resume(returning: [Float](repeating: 0, count: 2400))
-        continuation = nil
-    }
-
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        finish()
-    }
-
-    /// Audio session interruption / explicit cancel — also resume so the
-    /// upstream pipeline doesn't stay in `isGenerating` forever.
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        finish()
-    }
-}
 
 enum MessageRole { case user, assistant, system }
 
@@ -69,7 +26,6 @@ final class CompanionChatViewModel {
     var inputText = ""
     var currentPartial = ""
     var isLoading = false
-    var isGenerating = false
     var isListening = false
     var isSpeechDetected = false
     var pipelineState = "idle"
@@ -90,20 +46,11 @@ final class CompanionChatViewModel {
 
     private var vadModel: SileroVADModel?
     private var asrModel: CoreMLASRModel?
-    private var ttsModel: (any SpeechGenerationModel)?
     private var recognizer: Qwen3PseudoStreamingASR?
     private var audioEngine: AVAudioEngine?
-    private let player = StreamingAudioPlayer()
-    private var isSpeaking = false
-    private var lastResponseAudioDuration: Double = 0
-    private var responseAudioStartTime: CFAbsoluteTime = 0
-    private var pipelineCooldownEnd: CFAbsoluteTime = 0
     private var micRecordBuffer: [Float] = []
-    private var ttsRecordBuffer: [Float] = []
     private var debugLog: [String] = []
     private var agcRecentPeak: Float = 0
-
-    private let pipelinePostPlaybackGuard: Double = 0.5
 
     private func dbg(_ msg: String) {
         let ts = String(format: "%.3f", CFAbsoluteTimeGetCurrent().truncatingRemainder(dividingBy: 1000))
@@ -130,7 +77,7 @@ final class CompanionChatViewModel {
                     offlineMode: vadDir.isBundled
                 ) { progress, status in
                     DispatchQueue.main.async { [weak self] in
-                        self?.loadProgress = 0.05 + progress * 0.15
+                        self?.loadProgress = 0.05 + progress * 0.20
                         if !status.isEmpty { self?.loadingStatus = "VAD: \(status)" }
                     }
                 }
@@ -138,14 +85,14 @@ final class CompanionChatViewModel {
 
             let asrDir = BundledModelStore.preferredDirectory(for: .qwen3ASR)
             loadingStatus = "Loading Qwen3 ASR (\(asrDir.loadingModeDescription))..."
-            loadProgress = 0.2
+            loadProgress = 0.25
             asrModel = try await Task.detached {
                 let model = try await CoreMLASRModel.fromPretrained(
                     cacheDir: asrDir.url,
                     offlineMode: asrDir.isBundled
                 ) { progress, status in
                     DispatchQueue.main.async { [weak self] in
-                        self?.loadProgress = 0.2 + progress * 0.4
+                        self?.loadProgress = 0.25 + progress * 0.70
                         if !status.isEmpty { self?.loadingStatus = "Qwen3 ASR: \(status)" }
                     }
                 }
@@ -153,29 +100,6 @@ final class CompanionChatViewModel {
                 return model
             }.value
             asrBackend = asrDir.isBundled ? "ANE (bundled)" : "ANE"
-
-            loadingStatus = "Loading TTS..."
-            loadProgress = 0.6
-            #if targetEnvironment(simulator)
-            ttsModel = AppleTTSModel()
-            loadProgress = 0.95
-            #else
-            let ttsDir = BundledModelStore.preferredDirectory(for: .kokoroTTS)
-            loadingStatus = "Loading TTS (\(ttsDir.loadingModeDescription))..."
-            ttsModel = try await Task.detached {
-                let model = try await KokoroTTSModel.fromPretrained(
-                    cacheDir: ttsDir.url,
-                    offlineMode: ttsDir.isBundled
-                ) { progress, status in
-                    DispatchQueue.main.async { [weak self] in
-                        self?.loadProgress = 0.6 + progress * 0.35
-                        if !status.isEmpty { self?.loadingStatus = "TTS: \(status)" }
-                    }
-                }
-                try model.warmUp()
-                return model
-            }.value
-            #endif
 
             loadProgress = 1.0
             loadingStatus = "Ready"
@@ -216,9 +140,7 @@ final class CompanionChatViewModel {
         recognizer?.stop()
         recognizer = nil
         isListening = false
-        isGenerating = false
         isSpeechDetected = false
-        isSpeaking = false
         currentPartial = ""
         audioLevel = 0
         pipelineState = "idle"
@@ -251,7 +173,7 @@ final class CompanionChatViewModel {
             }
 
             messages.append(ChatBubbleMessage(role: .user, text: trimmed))
-            speakEcho(trimmed)
+            pipelineState = isListening ? "listening" : "idle"
 
         case .forceSplit(let duration):
             dbg("forceSplit after \(String(format: "%.1f", duration))s")
@@ -270,54 +192,11 @@ final class CompanionChatViewModel {
         }
     }
 
-    private func speakEcho(_ text: String) {
-        guard let tts = ttsModel else { return }
-        isGenerating = true
-        isSpeaking = false
-        lastResponseAudioDuration = 0
-        responseAudioStartTime = CFAbsoluteTimeGetCurrent()
-        pipelineState = "speaking..."
-        messages.append(ChatBubbleMessage(role: .assistant, text: "🔊 \(text)"))
-
-        Task {
-            do {
-                let samples = try await tts.generate(text: text, language: nil)
-                if !samples.isEmpty {
-                    ttsRecordBuffer.append(contentsOf: samples)
-                    lastResponseAudioDuration = Double(samples.count) / Double(tts.sampleRate)
-                    isSpeaking = true
-                    try player.play(samples: samples, sampleRate: tts.sampleRate)
-                }
-                finishSpeaking()
-            } catch {
-                dbg("TTS error: \(error.localizedDescription)")
-                errorMessage = error.localizedDescription
-                finishSpeaking()
-            }
-        }
-    }
-
-    private func finishSpeaking() {
-        let elapsedSinceAudioStart = CFAbsoluteTimeGetCurrent() - responseAudioStartTime
-        let remainingPlayback = max(0, lastResponseAudioDuration - elapsedSinceAudioStart)
-        let guardDuration = remainingPlayback + pipelinePostPlaybackGuard
-        dbg("responseDone (audio=\(String(format: "%.1f", lastResponseAudioDuration))s, guard=\(String(format: "%.1f", guardDuration))s)")
-        isGenerating = false
-        isSpeaking = false
-        player.markGenerationComplete()
-        pipelineCooldownEnd = CFAbsoluteTimeGetCurrent() + guardDuration
-        lastResponseAudioDuration = 0
-        if isListening {
-            pipelineState = "listening"
-        }
-    }
-
     // MARK: - Text fallback
 
     func send(_ text: String) {
         messages.append(ChatBubbleMessage(role: .user, text: text))
         inputText = ""
-        speakEcho(text)
     }
 
     func clearChat() {
@@ -421,25 +300,11 @@ final class CompanionChatViewModel {
                 self.micRecordBuffer.removeFirst(self.micRecordBuffer.count - maxMicSamples)
             }
 
-            let now = CFAbsoluteTimeGetCurrent()
-            if self.isGenerating || now < self.pipelineCooldownEnd {
-                self.agcRecentPeak = 0
-                self.recognizer?.pushAudio([Float](repeating: 0, count: samples.count))
-                return
-            }
-
             self.recognizer?.pushAudio(self.applyAGC(to: samples))
         }
 
-        guard let playerFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32, sampleRate: 24000,
-            channels: 1, interleaved: false
-        ) else { return }
-        player.attach(to: engine, format: playerFormat)
-
         do {
             try engine.start()
-            player.startPlayback()
             audioEngine = engine
         } catch {
             errorMessage = "Mic error: \(error.localizedDescription)"
@@ -448,7 +313,6 @@ final class CompanionChatViewModel {
 
     private func stopMicrophone() {
         audioEngine?.inputNode.removeTap(onBus: 0)
-        player.fadeOutAndStop()
         audioEngine?.stop()
         audioEngine = nil
     }
@@ -488,13 +352,6 @@ final class CompanionChatViewModel {
             writeWAV(samples: micRecordBuffer, sampleRate: 16000, to: url)
             pipelineLog.warning("DEBUG MIC: \(url.path) (\(self.micRecordBuffer.count / 16000)s)")
             micRecordBuffer.removeAll()
-        }
-
-        if !ttsRecordBuffer.isEmpty {
-            let url = dir.appendingPathComponent("tts_debug.wav")
-            writeWAV(samples: ttsRecordBuffer, sampleRate: 24000, to: url)
-            pipelineLog.warning("DEBUG TTS: \(url.path) (\(self.ttsRecordBuffer.count / 24000)s)")
-            ttsRecordBuffer.removeAll()
         }
 
         if !debugLog.isEmpty {
