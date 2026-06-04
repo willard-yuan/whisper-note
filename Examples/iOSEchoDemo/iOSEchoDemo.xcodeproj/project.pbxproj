@@ -19,12 +19,14 @@
 		D92E31EBD76831BA7043AC92 /* CompanionChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F77D422D6D4EF156935787B9 /* CompanionChatViewModel.swift */; };
 		E7AFAAD1CC6078F212C6ACFA /* Qwen3PseudoStreamingASR.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7435FE328299632FC121FF8 /* Qwen3PseudoStreamingASR.swift */; };
 		FD0E3E6E13B58321A66ABB02 /* Qwen3ASR in Frameworks */ = {isa = PBXBuildFile; productRef = 0CD0961767393FDA6C01CB0D /* Qwen3ASR */; };
+		FFDF56868407FE4D299637BE /* BundledModels in Resources */ = {isa = PBXBuildFile; fileRef = 6D310DAEA9CD6AA6B6720402 /* BundledModels */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		001B9057BDFCBDEEBB6ECF99 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		26A43225A3AD8055A508396C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		2D503B4C16B7B8B791C15953 /* Public */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Public; path = ../..; sourceTree = SOURCE_ROOT; };
+		44938EF033D205B60D7199B5 /* whisper-note */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "whisper-note"; path = ../..; sourceTree = SOURCE_ROOT; };
+		6D310DAEA9CD6AA6B6720402 /* BundledModels */ = {isa = PBXFileReference; lastKnownFileType = folder; name = BundledModels; path = iOSEchoDemo/BundledModels; sourceTree = SOURCE_ROOT; };
 		A13A375D9B6BE9D517B2673F /* CompanionChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionChatView.swift; sourceTree = "<group>"; };
 		A9A04D6BB7518ED0D92B15A6 /* BundledModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledModelStore.swift; sourceTree = "<group>"; };
 		ADE30648F371FB1EBA9A0166 /* VoiceLevelBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLevelBar.swift; sourceTree = "<group>"; };
@@ -53,6 +55,7 @@
 		06C26A3C18B912BDE1522CA0 = {
 			isa = PBXGroup;
 			children = (
+				6D310DAEA9CD6AA6B6720402 /* BundledModels */,
 				8E8FA63C16074E7B9E0D3165 /* iOSEchoDemo */,
 				BC3F54D2DEB1667E45DE2F2A /* Packages */,
 				CEAE63C4C39CF528CECE92CC /* Products */,
@@ -78,7 +81,7 @@
 		BC3F54D2DEB1667E45DE2F2A /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				2D503B4C16B7B8B791C15953 /* Public */,
+				44938EF033D205B60D7199B5 /* whisper-note */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -99,6 +102,7 @@
 			buildConfigurationList = C679579BD4C3F79E69623021 /* Build configuration list for PBXNativeTarget "iOSEchoDemo" */;
 			buildPhases = (
 				472424893D2646AFE28BEEC4 /* Sources */,
+				B91D2B2E20889860B490A771 /* Resources */,
 				F81A40BC2A55E49BD176C93D /* Frameworks */,
 			);
 			buildRules = (
@@ -151,6 +155,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B91D2B2E20889860B490A771 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FFDF56868407FE4D299637BE /* BundledModels in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		472424893D2646AFE28BEEC4 /* Sources */ = {
